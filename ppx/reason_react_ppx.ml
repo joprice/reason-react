@@ -350,7 +350,7 @@ let rec recursivelyMakeNamedArgsForExternal list args =
 [@@raises Invalid_argument]
 
 (* Build an AST node for the [@bs.obj] representing props for a component *)
-let makePropsValue fnName loc namedArgListWithKeyAndRef propsType =
+let _makePropsValue fnName loc namedArgListWithKeyAndRef propsType =
   let propsName = fnName ^ "Props" in
   {
     pval_name = { txt = propsName; loc };
@@ -379,21 +379,22 @@ let makePropsValue fnName loc namedArgListWithKeyAndRef propsType =
 
 (* Build an AST node representing an `external` with the definition of the
    [@bs.obj] *)
-let makePropsExternal fnName loc namedArgListWithKeyAndRef propsType =
+let _makePropsExternal fnName loc namedArgListWithKeyAndRef propsType =
   {
     pstr_loc = loc;
     pstr_desc =
       Pstr_primitive
-        (makePropsValue fnName loc namedArgListWithKeyAndRef propsType);
+        (_makePropsValue fnName loc namedArgListWithKeyAndRef propsType);
   }
 [@@raises Invalid_argument]
 
 (* Build an AST node for the signature of the `external` definition *)
-let makePropsExternalSig fnName loc namedArgListWithKeyAndRef propsType =
+let _makePropsExternalSig fnName loc namedArgListWithKeyAndRef propsType =
   {
     psig_loc = loc;
     psig_desc =
-      Psig_value (makePropsValue fnName loc namedArgListWithKeyAndRef propsType);
+      Psig_value
+        (_makePropsValue fnName loc namedArgListWithKeyAndRef propsType);
   }
 [@@raises Invalid_argument]
 
@@ -477,8 +478,8 @@ let reactJsxExprAndChildren = jsxExprAndChildren ~ident:"React"
 let reactDomJsxExprAndChildren = jsxExprAndChildren ~ident:"ReactDOM"
 
 (* Builds an AST node for the entire `external` definition of props *)
-let makeExternalDecl fnName loc namedArgListWithKeyAndRef namedTypeList =
-  makePropsExternal fnName loc
+let _makeExternalDecl fnName loc namedArgListWithKeyAndRef namedTypeList =
+  _makePropsExternal fnName loc
     (List.map pluckLabelDefaultLocType namedArgListWithKeyAndRef)
     (makePropsType ~loc namedTypeList)
 [@@raises Invalid_argument]
@@ -522,7 +523,7 @@ let jsxMapper =
           Ldot (fullPath, caller)
       | modulePath -> modulePath
     in
-    let propsIdent =
+    let _propsIdent =
       match ident with
       | Lident path -> Lident (path ^ "Props")
       | Ldot (ident, path) -> Ldot (ident, path ^ "Props")
@@ -535,16 +536,82 @@ let jsxMapper =
       ( nolabel,
         Builder.pexp_ident ~loc:parentExpLoc { txt = ident; loc = parentExpLoc }
       )
-    and props =
+    and _props =
       ( nolabel,
         Builder.pexp_apply ~loc:parentExpLoc
           (Builder.pexp_ident ~loc:parentExpLoc
-             { loc = parentExpLoc; txt = propsIdent })
+             { loc = parentExpLoc; txt = _propsIdent })
           propsArg )
+    in
+    let propsArg =
+      propsArg |> List.to_seq
+      |> Seq.take (List.length propsArg - 1)
+      |> List.of_seq
+    in
+    print_endline
+      (("found " ^ (List.length propsArg |> string_of_int))
+      ^ " "
+      ^ String.concat "," (propsArg |> List.map fst |> List.map getLabel));
+    let propsArg =
+      if List.length propsArg > 0 then
+        {
+          pexp_desc =
+            Pexp_extension
+              ( { txt = "mel.obj"; loc = parentExpLoc },
+                PStr
+                  [
+                    {
+                      pstr_desc =
+                        Pstr_eval
+                          ( {
+                              pexp_desc =
+                                Pexp_record
+                                  ( List.map
+                                      (fun (label, exp) ->
+                                        ( {
+                                            txt = Lident (getLabel label);
+                                            loc = parentExpLoc;
+                                          },
+                                          exp ))
+                                      propsArg,
+                                    None );
+                              pexp_loc = parentExpLoc;
+                              pexp_loc_stack = [];
+                              pexp_attributes = [];
+                            },
+                            [] );
+                      pstr_loc = parentExpLoc;
+                    };
+                  ] );
+          pexp_loc = parentExpLoc;
+          pexp_loc_stack = [];
+          pexp_attributes = [];
+        }
+      else
+        {
+          pexp_desc =
+            Pexp_apply
+              ( {
+                  pexp_desc =
+                    Pexp_ident
+                      {
+                        txt = Ldot (Ldot (Lident "Js", "Obj"), "empty");
+                        loc = parentExpLoc;
+                      };
+                  pexp_loc = parentExpLoc;
+                  pexp_loc_stack = [];
+                  pexp_attributes = [];
+                },
+                [ (nolabel, unit) ] );
+          pexp_loc = parentExpLoc;
+          pexp_loc_stack = [];
+          pexp_attributes = [];
+        }
     in
     match key with
     | None ->
-        Builder.pexp_apply ~loc:parentExpLoc ~attrs jsxExpr [ component; props ]
+        Builder.pexp_apply ~loc:parentExpLoc ~attrs jsxExpr
+          [ component; (nolabel, propsArg) ]
     | Some (label, key) ->
         (* We create a let binding with the value of the key to ensure
            the inferred type https://github.com/reasonml/reason-react/pull/752 *)
@@ -564,7 +631,7 @@ let jsxMapper =
                  Builder.pexp_ident ~loc:parentExpLoc
                    { txt = Lident key_var_txt; loc = parentExpLoc } );
                component;
-               props;
+               (nolabel, propsArg);
                (nolabel, unit);
              ])
   in
@@ -800,8 +867,8 @@ let jsxMapper =
               (label, None (* default *), loc, Some type_)
             in
             let retPropsType = makePropsType ~loc:pstr_loc namedTypeList in
-            let externalPropsDecl =
-              makePropsExternal fnName pstr_loc
+            let _externalPropsDecl =
+              _makePropsExternal fnName pstr_loc
                 ((optional "key", None, pstr_loc, Some (keyType pstr_loc))
                 :: List.map pluckLabelAndLoc propTypes)
                 retPropsType
@@ -823,7 +890,8 @@ let jsxMapper =
                     };
               }
             in
-            externalPropsDecl :: newStructure :: returnStructures
+            (*externalPropsDecl :: *)
+            newStructure :: returnStructures
         | _ ->
             raise
               (Invalid_argument
@@ -1092,8 +1160,8 @@ let jsxMapper =
             in
             let namedTypeList = List.fold_left argToType [] namedArgList in
             let loc = gloc in
-            let externalDecl =
-              makeExternalDecl fnName loc namedArgListWithKeyAndRef
+            let _externalDecl =
+              _makeExternalDecl fnName loc namedArgListWithKeyAndRef
                 namedTypeList
             in
             let innerExpressionArgs =
@@ -1189,7 +1257,7 @@ let jsxMapper =
                     ],
                     Some (bindingWrapper fullExpression) )
             in
-            (Some externalDecl, bindings, newBinding)
+            (None, bindings, newBinding)
           else (None, [ binding ], None)
             [@@raises Invalid_argument]
         in
@@ -1261,8 +1329,8 @@ let jsxMapper =
               (label, None, loc, Some type_)
             in
             let retPropsType = makePropsType ~loc:psig_loc namedTypeList in
-            let externalPropsDecl =
-              makePropsExternalSig fnName psig_loc
+            let _externalPropsDecl =
+              _makePropsExternalSig fnName psig_loc
                 ((optional "key", None, psig_loc, Some (keyType psig_loc))
                 :: List.map pluckLabelAndLoc propTypes)
                 retPropsType
@@ -1284,7 +1352,7 @@ let jsxMapper =
                     };
               }
             in
-            externalPropsDecl :: newStructure :: returnSignatures
+            (*externalPropsDecl ::*) newStructure :: returnSignatures
         | _ ->
             raise
               (Invalid_argument
