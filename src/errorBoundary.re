@@ -11,6 +11,7 @@ type params('error) = {
   info,
 };
 
+/*
 [%%mel.raw
   {|
   var React = require("react");
@@ -32,6 +33,7 @@ type params('error) = {
   })(React.Component);
 |}
 ];
+*/
 
 module React = Types;
 
