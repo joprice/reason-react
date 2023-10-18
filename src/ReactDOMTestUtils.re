@@ -16,7 +16,8 @@ let act: (unit => unit) => unit =
   };
 
 [@mel.module "react-dom/test-utils"]
-external reactActAsync: ((. unit) => Js.Promise.t('a)) => Js.Promise.t(unit) =
+external reactActAsync:
+  ((. unit) => Js.Promise.t('a)) => Js.Promise.t(unit) =
   "act";
 
 let actAsync = func => {
