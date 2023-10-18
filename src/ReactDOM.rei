@@ -451,6 +451,7 @@ module Client: {
   external hydrateRoot: (Dom.element, React.element) => root = "hydrateRoot";
 };
 
+/*
 [@deprecated
   "This function will be removed in the next release. Use ReactDOM.Client.createRoot and ReactDOM.Client.render instead."
 ]
@@ -473,6 +474,7 @@ external unmountComponentAtNode: Dom.element => unit =
 
 [@mel.module "react-dom"]
 external flushSync: (unit => unit) => unit = "flushSync";
+*/
 
 external domElementToObj: Dom.element => Js.t({..}) = "%identity";
 
