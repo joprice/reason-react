@@ -13,7 +13,7 @@ type params('error) = {
 
 [%%mel.raw
   {|
-  var React = require("react");
+  import * as React from "react";
   var ErrorBoundary = (function (Component) {
     function ErrorBoundary(props) {
       Component.call(this);
