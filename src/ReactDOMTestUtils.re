@@ -127,7 +127,7 @@ module DOM = {
 
   let findBySelectorAndPartialTextContent = (element, selector, content) =>
     querySelectorAll(element, selector)
-    |> Array.find_opt(node => node->textContent->Js.String2.includes(content));
+    |> Array.find_opt(node => node->textContent->Js.String.includes(~search=content, ()));
 };
 
 let prepareContainer = (container: ref(option(Dom.element)), ()) => {
